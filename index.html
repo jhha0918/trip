@@ -90,6 +90,10 @@ ol.tl { list-style: none; margin: 0; padding: 0; }
   box-shadow: 0 2px 10px rgba(0,0,0,.16); backdrop-filter: blur(2px);
 }
 .pin.active .pinName { display: block; }
+.pinTip { white-space: normal; width: 240px; padding: 8px 10px; }
+.pop .go { color: #1864ab; font-weight: 600; }
+.pop h3 a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.pop .webLink { display: inline-block; padding: 5px 10px; border-radius: 8px; background: #eef3f8; color: #1864ab; font-weight: 600; text-decoration: none; }
 .pop h3 { margin: 0 0 2px; font-size: 1rem; }
 .pop .t { color: #555; font-size: .8rem; }
 .pop p { margin: 4px 0 0; font-size: .85rem; }
@@ -131,15 +135,15 @@ ol.tl { list-style: none; margin: 0; padding: 0; }
 /** 장소 좌표. approx=true 는 좌표를 확정하지 못한 곳(주소 기준 추정). */
 var stops = {
   bucheon:      { name: '부천', lat: 37.50468, lng: 126.76400, approx: true, noLink: true },
-  malti:        { name: '말티재 전망대', lat: 36.49906, lng: 127.78928 },
-  jeongipum:    { name: '정이품송', lat: 36.51734, lng: 127.81559 },
-  baeyoungsook: { name: '배영숙산야초밥상', lat: 36.5342, lng: 127.8262, approx: true, query: '배영숙산야초밥상 보은' },
-  beopju:       { name: '법주사', lat: 36.54382, lng: 127.83497 },
-  sejo:         { name: '세조길', lat: 36.54027, lng: 127.83248 },
-  hyuyang:      { name: '말티재 자연휴양림', lat: 36.49053, lng: 127.78432 },
-  surakan:      { name: '수라간', lat: 36.5338, lng: 127.8257, approx: true, query: '수라간 속리산 보은' },
-  samnyeon:     { name: '삼년산성', lat: 36.48808, lng: 127.74253 },
-  gimcheon:     { name: '김천식당', lat: 36.48245, lng: 127.72146 }
+  malti:        { name: '말티재 전망대', lat: 36.49906, lng: 127.78928, web: { url: 'https://xn--ok0b236bp0a.com/place/22241', label: '말티재 전망대 안내 (여기유)', official: false } },
+  jeongipum:    { name: '정이품송', lat: 36.51734, lng: 127.81559, web: { url: 'https://www.ktriptips.com/kor/tourspot/126009', label: '정이품송 안내 (대한민국 구석구석)', official: false } },
+  baeyoungsook: { name: '배영숙산야초밥상', lat: 36.5342, lng: 127.8262, approx: true, query: '배영숙산야초밥상 보은', web: { url: 'https://www.diningcode.com/profile.php?rid=dsNq2rnLyeCl', label: '메뉴·후기 (다이닝코드)', official: false } },
+  beopju:       { name: '법주사', lat: 36.54382, lng: 127.83497, web: { url: 'https://beopjusa.org/', label: '법주사 공식 홈페이지', official: true } },
+  sejo:         { name: '세조길', lat: 36.54027, lng: 127.83248, web: { url: 'https://search.naver.com/search.naver?query=%EC%86%8D%EB%A6%AC%EC%82%B0%20%EC%84%B8%EC%A1%B0%EA%B8%B8', label: '세조길 정보 검색 (네이버)', official: false } },
+  hyuyang:      { name: '말티재 자연휴양림', lat: 36.49053, lng: 127.78432, web: { url: 'https://www.foresttrip.go.kr/', label: '숲나들e 공식 예약 사이트', official: true } },
+  surakan:      { name: '수라간', lat: 36.5338, lng: 127.8257, approx: true, query: '수라간 속리산 보은', web: { url: 'https://www.diningcode.com/profile.php?rid=VhLPurMYS0Hy', label: '메뉴·후기 (다이닝코드)', official: false } },
+  samnyeon:     { name: '삼년산성', lat: 36.48808, lng: 127.74253, web: { url: 'https://www.ktriptips.com/kor/tourspot/125989', label: '삼년산성 안내 (대한민국 구석구석)', official: false } },
+  gimcheon:     { name: '김천식당', lat: 36.48245, lng: 127.72146, web: { url: 'https://www.diningcode.com/profile.php?rid=k584lUGBM3WY', label: '메뉴·후기 (다이닝코드)', official: false } }
 };
 
 /** 일정. stop: 장소 키, next: 다음 이동(표 값), calc: 표에 없어 경로 계산값을 쓴 경우 */
@@ -219,6 +223,8 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 var layer = L.layerGroup().addTo(map);
 var showingAll = false;
+/** 마우스 hover 가능 기기 여부(터치 기기는 툴팁이 남아 지도를 가리므로 제외) */
+var canHover = window.matchMedia('(hover: hover)').matches;
 var FitControl = L.Control.extend({
   options: { position: 'topright' },
   /** 현지/전체 경로 전환 버튼 생성 */
@@ -300,14 +306,22 @@ function drawMap(day) {
       if (it.check) body += '<p class="w">전화 확인 필요</p>';
     });
     if (s.approx && !s.noLink) body += '<p class="w">좌표 추정 — 카카오맵에서 이름으로 검색</p>';
-    var url = kakaoUrl(key);
-    if (url) body += '<p><a href="' + url + '" target="_blank" rel="noopener">카카오맵에서 열기</a></p>';
-    m.bindPopup(body + '</div>', { maxWidth: 260 });
+    if (s.web) {
+      // 홈페이지가 있는 장소: 마우스를 올리면 요약, 클릭하면 홈페이지로 바로 이동
+      body += '<p class="go">🔗 클릭하면 이동: ' + esc(s.web.label) + '</p>';
+      if (canHover) m.bindTooltip(body + '</div>', { direction: 'top', offset: [0, -18], opacity: 1, className: 'pinTip' });
+    } else {
+      m.bindPopup(body + '</div>', { maxWidth: 260 });
+    }
     m.on('click', function () {
       var first = days[day].items.findIndex(function (it) { return it.stop === key; });
       selectStop(key, first);
       var el = document.querySelector('.item[data-idx="' + first + '"]');
       if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      if (s.web) {
+        if (m.getTooltip()) m.closeTooltip();
+        window.open(s.web.url, '_blank', 'noopener');
+      }
     });
     markers[key] = m;
   });
@@ -337,9 +351,10 @@ function renderTimeline(day) {
     html += '</div>';
     if (it.memo) html += '<p class="memo">' + esc(it.memo) + '</p>';
     if (it.note) html += '<p class="memo note">⚠ ' + esc(it.note) + '</p>';
-    if (url || it.tel) {
+    if (url || it.tel || s.web) {
       html += '<div class="links">';
       if (url) html += '<a class="kakao ' + (s.approx ? 'approx' : '') + '" href="' + url + '" target="_blank" rel="noopener">카카오맵에서 열기</a>';
+      if (s.web) html += '<a href="' + s.web.url + '" target="_blank" rel="noopener">🔗 ' + (s.web.official ? '공식 홈페이지' : '정보 보기') + '</a>';
       if (it.tel) html += '<a href="tel:' + it.tel.replace(/-/g, '') + '">📞 ' + esc(it.tel) + '</a>';
       html += '</div>';
     }
